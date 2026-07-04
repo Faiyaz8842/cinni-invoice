@@ -225,7 +225,7 @@
     <div class="brand">
       <span class="stitch-dot"></span>
       <div>
-        <h1>Invoice Studio</h1>
+        <h1>CINNI Invoice Studio</h1>
         <p>Restricted Access</p>
       </div>
     </div>
@@ -244,22 +244,11 @@
     <div class="brand">
       <span class="stitch-dot"></span>
       <div>
-        <h1>Invoice Studio</h1>
+        <h1>CINNI Invoice Studio</h1>
         <p>Commercial Invoice Generator</p>
       </div>
     </div>
 
-    <div class="section">
-      <h2>Company Logo</h2>
-      <div class="logo-upload">
-        <img id="logo_preview" style="display:none;">
-        <div class="ph" id="logo_placeholder">No<br>logo</div>
-        <div class="controls">
-          <input type="file" id="logo_upload" accept="image/*">
-          <button class="tiny-btn" id="remove_logo" type="button">Remove logo</button>
-        </div>
-      </div>
-    </div>
 
     <div class="section">
       <h2>Seller</h2>
@@ -293,7 +282,7 @@
       <div class="field">
         <label>Foreign Currency (alongside INR)</label>
         <select id="inv_currency">
-          <option value="USD">USD ($) — United States</option>
+          <option value="USD" selected>USD ($) — United States</option>
           <option value="GBP">GBP (£) — United Kingdom</option>
           <option value="EUR">EUR (€) — Europe</option>
           <option value="CAD">CAD (CA$) — Canada</option>
@@ -306,8 +295,8 @@
       <div class="field" id="method_field">
         <label>Amount Method</label>
         <select id="inv_method">
+          <option value="manual" selected>Enter foreign amount directly</option>
           <option value="rate">Use exchange rate (auto/manual rate)</option>
-          <option value="manual">Enter foreign amount directly</option>
         </select>
       </div>
 
@@ -370,8 +359,13 @@ const DEFAULT_GSHEET_URL = 'https://script.google.com/macros/s/AKfycbyFGYUr8SiUy
 // this page's source code. Do not rely on this alone to protect sensitive
 // data; consider Vercel's built-in deployment password protection for
 // stronger access control.
-const ADMIN_USER = 'admin';
-const ADMIN_PASS = 'Faiyaz8842@';
+//
+// To add or remove users, edit this list — each entry is 'username': 'password'.
+const USERS = {
+  'Faiyaz': 'Faiyaz8842@',
+  'Aajam': 'Aajam@1234',
+  'Danish': 'Danish1234@'
+};
 
 function checkAuth(){
   if(sessionStorage.getItem('ci_authed')==='true'){
@@ -382,8 +376,9 @@ function attemptLogin(){
   const u = document.getElementById('login_user').value.trim();
   const p = document.getElementById('login_pass').value;
   const err = document.getElementById('login_error');
-  if(u===ADMIN_USER && p===ADMIN_PASS){
+  if(USERS[u]!==undefined && USERS[u]===p){
     sessionStorage.setItem('ci_authed','true');
+    sessionStorage.setItem('ci_authed_user', u);
     document.getElementById('login_overlay').style.display = 'none';
     err.textContent = '';
   }else{
@@ -395,6 +390,7 @@ document.getElementById('login_pass').addEventListener('keydown', e=>{ if(e.key=
 document.getElementById('login_user').addEventListener('keydown', e=>{ if(e.key==='Enter') attemptLogin(); });
 document.getElementById('logout_link').addEventListener('click', ()=>{
   sessionStorage.removeItem('ci_authed');
+  sessionStorage.removeItem('ci_authed_user');
   location.reload();
 });
 checkAuth();
@@ -406,11 +402,26 @@ let logoData = null; // {dataUrl, w, h}
 
 // ---------- persistence: seller details ----------
 const EXPORTER_FIELDS = ['exp_name','exp_addr','exp_gstin','exp_iec','exp_lut','exp_mobile','exp_email'];
+
+// Built-in default seller details — always pre-filled, even on a brand
+// new browser/device. Edit these to update the defaults for everyone.
+const DEFAULT_SELLER = {
+  exp_name: 'Cinni Enterprises',
+  exp_addr: '131/5 C 1 A Begum Purwa\nKanpur, UP \nIndia, 208023',
+  exp_gstin: '09EJAPA5756A1ZL',
+  exp_iec: '09EJAPA5756A',
+  exp_lut: 'AD090126036486Y',
+  exp_mobile: '+91 9044130123',
+  exp_email: 'contact@cinnileather.com'
+};
+
 function loadExporter(){
-  try{
-    const saved = JSON.parse(localStorage.getItem('ci_exporter')||'{}');
-    EXPORTER_FIELDS.forEach(id=>{ if(saved[id]!==undefined) document.getElementById(id).value = saved[id]; });
-  }catch(e){}
+  let saved = {};
+  try{ saved = JSON.parse(localStorage.getItem('ci_exporter')||'{}'); }catch(e){}
+  EXPORTER_FIELDS.forEach(id=>{
+    const val = (saved[id] !== undefined && saved[id] !== '') ? saved[id] : (DEFAULT_SELLER[id] || '');
+    document.getElementById(id).value = val;
+  });
 }
 function saveExporter(){
   const data = {};
@@ -419,11 +430,41 @@ function saveExporter(){
 }
 
 // ---------- persistence: logo ----------
+// Built-in default logo — loads automatically if no logo has been
+// manually uploaded in this browser yet.
+const DEFAULT_LOGO_URL = './logo.jpeg';
+
 function loadLogo(){
   try{
     const saved = JSON.parse(localStorage.getItem('ci_logo')||'null');
-    if(saved){ logoData = saved; showLogoPreview(); }
+    if(saved){ logoData = saved; showLogoPreview(); return; }
   }catch(e){}
+  if(DEFAULT_LOGO_URL){ loadDefaultLogoFromUrl(); }
+}
+
+function loadDefaultLogoFromUrl(){
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    try{
+      // convert to a base64 data URL so it can be embedded directly into the PDF
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      const dataUrl = canvas.toDataURL('image/png');
+      logoData = {dataUrl, w: img.naturalWidth, h: img.naturalHeight};
+      localStorage.setItem('ci_logo', JSON.stringify(logoData));
+    }catch(e){
+      logoData = {dataUrl: DEFAULT_LOGO_URL, w: img.naturalWidth, h: img.naturalHeight, externalOnly: true};
+      console.warn('Default logo could not be embedded in the PDF. It will still appear in the on-screen preview.');
+    }
+    showLogoPreview();
+    renderPreview();
+  };
+  img.onerror = () => {
+    console.warn('Could not load the default logo from:', DEFAULT_LOGO_URL);
+  };
+  img.src = DEFAULT_LOGO_URL;
 }
 function showLogoPreview(){
   const img = document.getElementById('logo_preview');
@@ -458,7 +499,6 @@ document.getElementById('remove_logo').addEventListener('click', ()=>{
   showLogoPreview();
   renderPreview();
 });
-
 // ---------- items UI ----------
 function renderItemRows(){
   const c = document.getElementById('items_container');
@@ -672,6 +712,7 @@ function buildRecord(state, totalInr, totalForeign){
     'Total (Foreign Currency)': state.inv.currency==='NONE' ? '' : totalForeign,
     'Total (INR)': totalInr,
     'Line Items': items.length,
+    'Created By': sessionStorage.getItem('ci_authed_user') || '',
     'Generated At': new Date().toLocaleString()
   };
 }
