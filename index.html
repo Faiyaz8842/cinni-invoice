@@ -116,16 +116,6 @@
   .rate-status.err{color:#d98a80;}
   .refresh-btn{background:none;border:none;color:var(--brass-bright);cursor:pointer;font-size:12px;text-decoration:underline;padding:0;}
 
-  .logo-upload{
-    display:flex;align-items:center;gap:12px;background:rgba(0,0,0,0.18);border:1px dashed rgba(201,161,95,0.4);
-    border-radius:var(--radius);padding:12px;
-  }
-  .logo-upload img{width:52px;height:52px;object-fit:contain;background:#fff;border-radius:4px;padding:4px;}
-  .logo-upload .ph{width:52px;height:52px;border-radius:4px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--cream-dim);text-align:center;}
-  .logo-upload .controls{flex:1;display:flex;flex-direction:column;gap:6px;}
-  .logo-upload input[type=file]{font-size:11px;color:var(--cream-dim);}
-  .tiny-btn{background:none;border:1px solid rgba(165,69,58,0.5);color:#d98a80;font-size:10.5px;padding:4px 8px;border-radius:4px;cursor:pointer;width:fit-content;}
-
   .generate-btn{
     width:100%;margin-top:28px;padding:15px;background:linear-gradient(180deg,var(--brass-bright),var(--brass));
     border:none;border-radius:var(--radius);color:#241a12;font-weight:700;font-size:14.5px;letter-spacing:0.4px;
@@ -225,7 +215,7 @@
     <div class="brand">
       <span class="stitch-dot"></span>
       <div>
-        <h1>CINNI Invoice Studio</h1>
+        <h1>Invoice Studio</h1>
         <p>Restricted Access</p>
       </div>
     </div>
@@ -244,11 +234,10 @@
     <div class="brand">
       <span class="stitch-dot"></span>
       <div>
-        <h1>CINNI Invoice Studio</h1>
+        <h1>Invoice Studio</h1>
         <p>Commercial Invoice Generator</p>
       </div>
     </div>
-
 
     <div class="section">
       <h2>Seller</h2>
@@ -362,9 +351,8 @@ const DEFAULT_GSHEET_URL = 'https://script.google.com/macros/s/AKfycbyFGYUr8SiUy
 //
 // To add or remove users, edit this list — each entry is 'username': 'password'.
 const USERS = {
-  'Faiyaz': 'Faiyaz8842@',
-  'Aajam': 'Aajam@1234',
-  'Danish': 'Danish1234@'
+  'admin': 'Faiyaz8842@',
+  'staff1': 'ChangeThisPassword123'   // <-- example second user, edit or remove
 };
 
 function checkAuth(){
@@ -407,7 +395,7 @@ const EXPORTER_FIELDS = ['exp_name','exp_addr','exp_gstin','exp_iec','exp_lut','
 // new browser/device. Edit these to update the defaults for everyone.
 const DEFAULT_SELLER = {
   exp_name: 'Cinni Enterprises',
-  exp_addr: '131/5 C 1 A Begum Purwa\nKanpur, UP \nIndia, 208023',
+  exp_addr: '131/5 C 1 A Begum Purwa\nKanpur, UP \nIndia - 208023',
   exp_gstin: '09EJAPA5756A1ZL',
   exp_iec: '09EJAPA5756A',
   exp_lut: 'AD090126036486Y',
@@ -429,20 +417,12 @@ function saveExporter(){
   localStorage.setItem('ci_exporter', JSON.stringify(data));
 }
 
-// ---------- persistence: logo ----------
-// Built-in default logo — loads automatically if no logo has been
-// manually uploaded in this browser yet.
+// ---------- logo (fixed, no upload option) ----------
+// Always loaded from this path — put your logo file in the same repo
+// folder as index.html, named to match this exactly.
 const DEFAULT_LOGO_URL = './logo.jpeg';
 
 function loadLogo(){
-  try{
-    const saved = JSON.parse(localStorage.getItem('ci_logo')||'null');
-    if(saved){ logoData = saved; showLogoPreview(); return; }
-  }catch(e){}
-  if(DEFAULT_LOGO_URL){ loadDefaultLogoFromUrl(); }
-}
-
-function loadDefaultLogoFromUrl(){
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.onload = () => {
@@ -453,52 +433,20 @@ function loadDefaultLogoFromUrl(){
       canvas.getContext('2d').drawImage(img, 0, 0);
       const dataUrl = canvas.toDataURL('image/png');
       logoData = {dataUrl, w: img.naturalWidth, h: img.naturalHeight};
-      localStorage.setItem('ci_logo', JSON.stringify(logoData));
     }catch(e){
+      // canvas got "tainted" — the host didn't send permissive CORS headers,
+      // so we can still show it on screen, but it can't be embedded in the PDF.
       logoData = {dataUrl: DEFAULT_LOGO_URL, w: img.naturalWidth, h: img.naturalHeight, externalOnly: true};
-      console.warn('Default logo could not be embedded in the PDF. It will still appear in the on-screen preview.');
+      console.warn('Logo could not be embedded in the PDF (CORS-restricted). It will still appear in the on-screen preview.');
     }
-    showLogoPreview();
     renderPreview();
   };
   img.onerror = () => {
-    console.warn('Could not load the default logo from:', DEFAULT_LOGO_URL);
+    console.warn('Could not load the logo from:', DEFAULT_LOGO_URL, '— make sure that file exists in the repo with this exact name.');
   };
   img.src = DEFAULT_LOGO_URL;
 }
-function showLogoPreview(){
-  const img = document.getElementById('logo_preview');
-  const ph = document.getElementById('logo_placeholder');
-  if(logoData){
-    img.src = logoData.dataUrl; img.style.display='block'; ph.style.display='none';
-  }else{
-    img.style.display='none'; ph.style.display='flex';
-  }
-}
-document.getElementById('logo_upload').addEventListener('change', (e)=>{
-  const file = e.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    const dataUrl = reader.result;
-    const imgEl = new Image();
-    imgEl.onload = () => {
-      logoData = {dataUrl, w:imgEl.naturalWidth, h:imgEl.naturalHeight};
-      localStorage.setItem('ci_logo', JSON.stringify(logoData));
-      showLogoPreview();
-      renderPreview();
-    };
-    imgEl.src = dataUrl;
-  };
-  reader.readAsDataURL(file);
-});
-document.getElementById('remove_logo').addEventListener('click', ()=>{
-  logoData = null;
-  localStorage.removeItem('ci_logo');
-  document.getElementById('logo_upload').value = '';
-  showLogoPreview();
-  renderPreview();
-});
+
 // ---------- items UI ----------
 function renderItemRows(){
   const c = document.getElementById('items_container');
@@ -753,7 +701,7 @@ function generatePDF(){
 
   // header: logo (left) + title (right of logo)
   let titleX = margin;
-  if(logoData){
+  if(logoData && !logoData.externalOnly){
     const logoH = 46;
     const logoW = Math.min(120, logoH * (logoData.w / logoData.h));
     try{ doc.addImage(logoData.dataUrl, getImageFormat(logoData.dataUrl), margin, y-32, logoW, logoH); }catch(e){}
@@ -881,7 +829,6 @@ document.getElementById('generate_pdf').addEventListener('click', generatePDF);
 
 // save seller details on any change within that section
 document.querySelectorAll('.panel input, .panel textarea, .panel select').forEach(el=>{
-  if(el.id==='logo_upload') return;
   el.addEventListener('input', ()=>{ saveExporter(); renderPreview(); });
   el.addEventListener('change', ()=>{ saveExporter(); renderPreview(); });
 });
