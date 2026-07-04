@@ -356,8 +356,12 @@ const USERS = {
 };
 
 function checkAuth(){
-  if(sessionStorage.getItem('ci_authed')==='true'){
+  const authedUser = sessionStorage.getItem('ci_authed_user');
+  if(sessionStorage.getItem('ci_authed')==='true' && authedUser && USERS[authedUser]!==undefined){
     document.getElementById('login_overlay').style.display = 'none';
+  }else{
+    sessionStorage.removeItem('ci_authed');
+    sessionStorage.removeItem('ci_authed_user');
   }
 }
 function attemptLogin(){
@@ -648,18 +652,20 @@ function renderPreview(){
 
 // ---------- Google Sheet sync (runs silently in the background) ----------
 function buildRecord(state, totalInr, totalForeign){
+  const createdBy = sessionStorage.getItem('ci_authed_user') || '';
+  const buyerAdd = state.con.addr || '';
   return {
     'Invoice No': state.inv.no,
     'Invoice Date': state.inv.date,
     'Order Reference': state.inv.ref,
     'Buyer Name': state.con.name,
+    'Buyer Add': buyerAdd,
     'Buyer Country': state.con.country,
-    'Buyer Add' : state.con.addr,
     'Currency': state.inv.currency,
     'Total (Foreign Currency)': state.inv.currency==='NONE' ? '' : totalForeign,
     'Total (INR)': totalInr,
     'Line Items': items.length,
-    'Created By': sessionStorage.getItem('ci_authed_user') || '',
+    'Created by': createdBy,
     'Generated At': new Date().toLocaleString()
   };
 }
@@ -667,9 +673,15 @@ function buildRecord(state, totalInr, totalForeign){
 async function pushToGoogleSheet(record){
   if(!DEFAULT_GSHEET_URL){ return; }
   try{
+    const params = new URLSearchParams();
+    Object.entries(record).forEach(([key, value])=>{
+      params.append(key, value == null ? '' : String(value));
+    });
+    const sheetUrl = DEFAULT_GSHEET_URL + (DEFAULT_GSHEET_URL.includes('?') ? '&' : '?') + params.toString();
+
     // no-cors: Apps Script web apps don't return CORS headers, so the
     // response is opaque — we can't read it, but the write still happens.
-    await fetch(DEFAULT_GSHEET_URL, {
+    await fetch(sheetUrl, {
       method:'POST',
       mode:'no-cors',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
