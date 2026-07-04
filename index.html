@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Commercial Invoice Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    --leather-dark:#241a12;
+    --leather:#3a2a1c;
+    --leather-light:#4d3826;
+    --brass:#c9a15f;
+    --brass-bright:#e0bc7f;
+    --cream:#ede2cd;
+    --cream-dim:#c9bda6;
+    --paper:#fbf7ef;
+    --paper-line:#e4dac5;
+    --ink:#2a2118;
+    --danger:#a5453a;
+    --radius:6px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse at top left, rgba(255,255,255,0.04), transparent 60%),
+      linear-gradient(160deg,var(--leather-dark),var(--leather) 55%,#2c2015 100%);
+    color:var(--cream);
+    font-family:'IBM Plex Sans',sans-serif;
+    min-height:100vh;
+  }
+  .app{
+    display:grid;
+    grid-template-columns:minmax(340px,440px) 1fr;
+    min-height:100vh;
+  }
+  @media (max-width:980px){
+    .app{grid-template-columns:1fr;}
+  }
+
+  /* ---------- FORM PANEL ---------- */
+  .panel{
+    background:linear-gradient(180deg,var(--leather-light),var(--leather));
+    padding:28px 26px 60px;
+    border-right:1px solid rgba(201,161,95,0.25);
+    overflow-y:auto;
+    max-height:100vh;
+  }
+  @media (max-width:980px){ .panel{max-height:none;border-right:none;border-bottom:1px solid rgba(201,161,95,0.25);} }
+
+  .brand{
+    display:flex;align-items:center;gap:10px;margin-bottom:6px;
+  }
+  .brand .stitch-dot{width:9px;height:9px;border-radius:50%;background:var(--brass);box-shadow:0 0 0 3px rgba(201,161,95,0.18);}
+  .brand h1{
+    font-family:'Fraunces',serif;font-weight:600;font-size:22px;margin:0;color:var(--cream);letter-spacing:0.2px;
+  }
+  .brand p{margin:2px 0 0;font-size:12px;color:var(--cream-dim);letter-spacing:0.4px;text-transform:uppercase;}
+
+  .section{
+    margin-top:26px;padding-top:20px;border-top:1px dashed rgba(201,161,95,0.35);
+  }
+  .section:first-of-type{border-top:none;margin-top:20px;padding-top:0;}
+  .section h2{
+    font-family:'Fraunces',serif;font-size:14px;font-weight:600;color:var(--brass-bright);
+    text-transform:uppercase;letter-spacing:1px;margin:0 0 14px;
+  }
+
+  .field{margin-bottom:12px;}
+  .field label{
+    display:block;font-size:11px;color:var(--cream-dim);margin-bottom:5px;letter-spacing:0.3px;text-transform:uppercase;
+  }
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+  input[type=text],input[type=number],input[type=date],textarea,select{
+    width:100%;background:rgba(0,0,0,0.22);border:1px solid rgba(201,161,95,0.3);
+    color:var(--cream);padding:9px 10px;border-radius:var(--radius);font-family:'IBM Plex Sans',sans-serif;
+    font-size:13.5px;outline:none;transition:border-color .15s,background .15s;
+  }
+  input::placeholder,textarea::placeholder{color:#8a7c66;}
+  input:focus,textarea:focus,select:focus{border-color:var(--brass-bright);background:rgba(0,0,0,0.32);}
+  textarea{resize:vertical;min-height:56px;font-family:'IBM Plex Sans',sans-serif;}
+  select{cursor:pointer;}
+  select option{background:var(--leather-dark);color:var(--cream);}
+
+  .items{border:1px solid rgba(201,161,95,0.25);border-radius:var(--radius);overflow:hidden;margin-top:4px;}
+  .item-row{
+    display:grid;grid-template-columns:2.2fr 1fr 0.6fr 1fr auto;gap:6px;padding:10px;
+    border-bottom:1px solid rgba(201,161,95,0.15);align-items:center;
+  }
+  .item-row:last-child{border-bottom:none;}
+  .item-row input{font-size:12.5px;padding:7px 8px;}
+  .rm-btn{
+    background:transparent;border:1px solid rgba(165,69,58,0.5);color:#d98a80;width:28px;height:28px;
+    border-radius:5px;cursor:pointer;font-size:14px;line-height:1;
+  }
+  .rm-btn:hover{background:rgba(165,69,58,0.2);}
+  .add-row{
+    width:100%;padding:10px;background:transparent;border:1px dashed rgba(201,161,95,0.5);
+    color:var(--brass-bright);border-radius:var(--radius);cursor:pointer;font-size:12.5px;margin-top:8px;
+    letter-spacing:0.3px;
+  }
+  .add-row:hover{background:rgba(201,161,95,0.08);}
+
+  .rate-box{
+    display:flex;align-items:center;gap:8px;background:rgba(0,0,0,0.18);border:1px solid rgba(201,161,95,0.25);
+    padding:9px 10px;border-radius:var(--radius);font-size:12px;color:var(--cream-dim);
+  }
+  .rate-box input{width:90px;padding:5px 7px;font-size:12.5px;}
+  .rate-status{font-size:10.5px;color:var(--cream-dim);margin-top:6px;}
+  .rate-status.ok{color:#8fbf8a;}
+  .rate-status.err{color:#d98a80;}
+  .refresh-btn{background:none;border:none;color:var(--brass-bright);cursor:pointer;font-size:12px;text-decoration:underline;padding:0;}
+
+  .logo-upload{
+    display:flex;align-items:center;gap:12px;background:rgba(0,0,0,0.18);border:1px dashed rgba(201,161,95,0.4);
+    border-radius:var(--radius);padding:12px;
+  }
+  .logo-upload img{width:52px;height:52px;object-fit:contain;background:#fff;border-radius:4px;padding:4px;}
+  .logo-upload .ph{width:52px;height:52px;border-radius:4px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--cream-dim);text-align:center;}
+  .logo-upload .controls{flex:1;display:flex;flex-direction:column;gap:6px;}
+  .logo-upload input[type=file]{font-size:11px;color:var(--cream-dim);}
+  .tiny-btn{background:none;border:1px solid rgba(165,69,58,0.5);color:#d98a80;font-size:10.5px;padding:4px 8px;border-radius:4px;cursor:pointer;width:fit-content;}
+
+  .generate-btn{
+    width:100%;margin-top:28px;padding:15px;background:linear-gradient(180deg,var(--brass-bright),var(--brass));
+    border:none;border-radius:var(--radius);color:#241a12;font-weight:700;font-size:14.5px;letter-spacing:0.4px;
+    cursor:pointer;text-transform:uppercase;box-shadow:0 4px 14px rgba(0,0,0,0.35);
+  }
+  .generate-btn:hover{filter:brightness(1.06);}
+  .generate-btn:active{transform:translateY(1px);}
+  .save-note{font-size:11px;color:var(--cream-dim);text-align:center;margin-top:10px;}
+
+  .excel-btn{
+    width:100%;padding:11px;background:transparent;border:1px solid rgba(201,161,95,0.5);
+    color:var(--brass-bright);border-radius:var(--radius);cursor:pointer;font-size:12.5px;margin-top:10px;
+  }
+  .excel-btn:hover{background:rgba(201,161,95,0.08);}
+  .log-count{font-size:11px;color:var(--cream-dim);text-align:center;margin-top:8px;}
+  .clear-log{background:none;border:none;color:#d98a80;text-decoration:underline;cursor:pointer;font-size:10.5px;}
+
+  /* ---------- PREVIEW PANEL ---------- */
+  .preview-wrap{
+    padding:40px 5vw;display:flex;align-items:flex-start;justify-content:center;
+  }
+  .paper-frame{
+    position:relative;padding:14px;
+  }
+  .stitch-border{
+    position:absolute;inset:6px;border:2px dashed rgba(201,161,95,0.7);border-radius:3px;pointer-events:none;
+  }
+  .paper{
+    background:var(--paper);color:var(--ink);width:100%;max-width:760px;padding:46px 48px 40px;
+    border-radius:2px;box-shadow:0 25px 60px rgba(0,0,0,0.45),0 4px 12px rgba(0,0,0,0.3);
+    font-family:'IBM Plex Sans',sans-serif;
+  }
+  .doc-header{display:flex;align-items:center;gap:18px;margin-bottom:4px;}
+  .doc-header img{max-width:70px;max-height:70px;object-fit:contain;}
+  .doc-title{font-family:'Fraunces',serif;font-size:26px;font-weight:700;letter-spacing:1px;margin:0;}
+  .doc-sub{font-size:11px;color:#8a7c66;letter-spacing:2px;text-transform:uppercase;margin:6px 0 26px;border-bottom:1px solid var(--paper-line);padding-bottom:18px;}
+
+  .parties{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-bottom:24px;}
+  .party h3{font-size:10.5px;text-transform:uppercase;letter-spacing:1.2px;color:#a5895a;margin:0 0 8px;}
+  .party .name{font-weight:600;font-size:14.5px;margin-bottom:3px;}
+  .party .line{font-size:12.5px;color:#4a4038;line-height:1.55;}
+  .party .meta{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6b5d48;margin-top:6px;}
+
+  .meta-strip{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:14px;background:#f2ead9;border:1px solid var(--paper-line);
+    border-radius:4px;padding:12px 16px;margin-bottom:24px;
+  }
+  .meta-strip div span{display:block;}
+  .meta-strip .k{font-size:9.5px;text-transform:uppercase;letter-spacing:0.8px;color:#8a7c66;}
+  .meta-strip .v{font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;margin-top:2px;}
+
+  table.items-table{width:100%;border-collapse:collapse;margin-bottom:22px;}
+  table.items-table th{
+    font-size:9.5px;text-transform:uppercase;letter-spacing:0.6px;color:#8a7c66;text-align:left;
+    border-bottom:1.5px solid var(--ink);padding:0 8px 8px;
+  }
+  table.items-table td{
+    font-size:12.5px;padding:10px 8px;border-bottom:1px solid var(--paper-line);vertical-align:top;
+  }
+  table.items-table td.num,table.items-table th.num{text-align:right;font-family:'IBM Plex Mono',monospace;}
+
+  .totals-cols{display:flex;gap:16px;margin-bottom:26px;}
+  .totals-card{flex:1;border:1.5px solid var(--ink);border-radius:4px;padding:14px 16px;}
+  .totals-card .k{font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:#8a7c66;margin-bottom:4px;}
+  .totals-card .v{font-family:'IBM Plex Mono',monospace;font-size:19px;font-weight:700;color:var(--ink);}
+
+  .declaration{font-size:11px;color:#6b5d48;line-height:1.6;border-top:1px solid var(--paper-line);padding-top:16px;margin-bottom:14px;}
+  .declaration b{color:#4a4038;}
+  .footer-note{font-size:10.5px;color:#a5895a;text-align:center;font-style:italic;}
+
+  .empty-hint{color:#a5895a;font-style:italic;}
+
+  /* ---------- LOGIN OVERLAY ---------- */
+  .login-overlay{
+    position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+    background:
+      radial-gradient(ellipse at top left, rgba(255,255,255,0.04), transparent 60%),
+      linear-gradient(160deg,var(--leather-dark),var(--leather) 55%,#2c2015 100%);
+    padding:20px;
+  }
+  .login-card{
+    width:100%;max-width:340px;background:linear-gradient(180deg,var(--leather-light),var(--leather));
+    border:1px solid rgba(201,161,95,0.3);border-radius:8px;padding:36px 32px;box-shadow:0 25px 60px rgba(0,0,0,0.5);
+  }
+  .login-card .brand{justify-content:center;margin-bottom:22px;}
+  .login-error{color:#d98a80;font-size:12px;text-align:center;margin-top:12px;min-height:14px;}
+  .logout-link{
+    display:block;text-align:right;font-size:11px;color:var(--cream-dim);text-decoration:underline;
+    cursor:pointer;margin-bottom:10px;
+  }
+</style>
+</head>
+<body>
+
+<div id="login_overlay" class="login-overlay">
+  <div class="login-card">
+    <div class="brand">
+      <span class="stitch-dot"></span>
+      <div>
+        <h1>Invoice Studio</h1>
+        <p>Restricted Access</p>
+      </div>
+    </div>
+    <div class="field"><label>Username</label><input id="login_user" type="text" autocomplete="username"></div>
+    <div class="field"><label>Password</label><input id="login_pass" type="password" autocomplete="current-password"></div>
+    <button class="generate-btn" id="login_btn" type="button" style="margin-top:6px;">Log In</button>
+    <p class="login-error" id="login_error"></p>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- ============ FORM PANEL ============ -->
+  <div class="panel">
+    <span class="logout-link" id="logout_link">Log out</span>
+    <div class="brand">
+      <span class="stitch-dot"></span>
+      <div>
+        <h1>Invoice Studio</h1>
+        <p>Commercial Invoice Generator</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Company Logo</h2>
+      <div class="logo-upload">
+        <img id="logo_preview" style="display:none;">
+        <div class="ph" id="logo_placeholder">No<br>logo</div>
+        <div class="controls">
+          <input type="file" id="logo_upload" accept="image/*">
+          <button class="tiny-btn" id="remove_logo" type="button">Remove logo</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Seller</h2>
+      <div class="field"><label>Company Name</label><input id="exp_name" type="text" placeholder="Cinni Enterprises"></div>
+      <div class="field"><label>Address</label><textarea id="exp_addr" placeholder="131/5 C 1 A Begum Purwa&#10;Kanpur, UP – 208023, India"></textarea></div>
+      <div class="row2">
+        <div class="field"><label>GSTIN</label><input id="exp_gstin" type="text" placeholder="09EJAPA5756A1ZL"></div>
+        <div class="field"><label>IEC Code</label><input id="exp_iec" type="text" placeholder="09EJAPA5756A"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>LUT ARN (optional)</label><input id="exp_lut" type="text" placeholder="AD090126036486Y"></div>
+        <div class="field"><label>Mobile No.</label><input id="exp_mobile" type="text" placeholder="+91 98765 43210"></div>
+      </div>
+      <div class="field"><label>Email (optional)</label><input id="exp_email" type="text" placeholder="orders@cinnienterprises.com"></div>
+    </div>
+
+    <div class="section">
+      <h2>Consignee</h2>
+      <div class="field"><label>Name</label><input id="con_name" type="text" placeholder="Michael Urueta"></div>
+      <div class="field"><label>Address</label><textarea id="con_addr" placeholder="17 Scarlett St&#10;Greenville, SC 29607-2826"></textarea></div>
+      <div class="field"><label>Country</label><input id="con_country" type="text" placeholder="United States"></div>
+    </div>
+
+    <div class="section">
+      <h2>Invoice Details</h2>
+      <div class="row2">
+        <div class="field"><label>Invoice No.</label><input id="inv_no" type="text" placeholder="Retail00007"></div>
+        <div class="field"><label>Invoice Date</label><input id="inv_date" type="date"></div>
+      </div>
+      <div class="field"><label>Order Reference</label><input id="inv_ref" type="text" placeholder="Etsy Order"></div>
+      <div class="field">
+        <label>Foreign Currency (alongside INR)</label>
+        <select id="inv_currency">
+          <option value="USD">USD ($) — United States</option>
+          <option value="GBP">GBP (£) — United Kingdom</option>
+          <option value="EUR">EUR (€) — Europe</option>
+          <option value="CAD">CAD (CA$) — Canada</option>
+          <option value="AUD">AUD (A$) — Australia</option>
+          <option value="NZD">NZD (NZ$) — New Zealand</option>
+          <option value="NONE">INR only (no conversion)</option>
+        </select>
+      </div>
+
+      <div class="field" id="method_field">
+        <label>Amount Method</label>
+        <select id="inv_method">
+          <option value="rate">Use exchange rate (auto/manual rate)</option>
+          <option value="manual">Enter foreign amount directly</option>
+        </select>
+      </div>
+
+      <div class="field" id="rate_field">
+        <label>Exchange Rate (1 INR = )</label>
+        <div class="rate-box">
+          <input id="inv_rate" type="number" step="0.0001" value="0.0120">
+          <span id="rate_currency_lbl">USD</span>
+          <button class="refresh-btn" id="refresh_rate" type="button">refetch live rate</button>
+        </div>
+        <div class="rate-status" id="rate_status">Using default rate — click refetch for live rate.</div>
+      </div>
+
+      <div class="field" id="manual_field" style="display:none;">
+        <label>Amount in <span id="manual_currency_lbl">USD</span></label>
+        <input id="inv_manual_amount" type="number" step="0.01" placeholder="e.g. 216.40">
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Goods</h2>
+      <div class="items" id="items_container"></div>
+      <button class="add-row" id="add_item" type="button">+ Add line item</button>
+    </div>
+
+    <div class="section">
+      <h2>Declaration</h2>
+      <div class="field">
+        <textarea id="declaration" style="min-height:90px;">Supply meant for export under LUT without payment of IGST. We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.</textarea>
+      </div>
+    </div>
+
+    <button class="generate-btn" id="generate_pdf">Generate & Download PDF</button>
+    <p class="save-note">Seller details and logo are saved in this browser so you won't need to re-enter them next time. Invoice records are synced automatically — no local Excel export is available here.</p>
+  </div>
+
+  <!-- ============ PREVIEW PANEL ============ -->
+  <div class="preview-wrap">
+    <div class="paper-frame">
+      <div class="stitch-border"></div>
+      <div class="paper" id="paper">
+        <!-- rendered by JS -->
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const CURRENCY_SYMBOL = {USD:'$',GBP:'£',EUR:'€',CAD:'CA$',AUD:'A$',NZD:'NZ$',NONE:''};
+const FALLBACK_RATES = {USD:0.0120,GBP:0.0095,EUR:0.0110,CAD:0.0165,AUD:0.0182,NZD:0.0198};
+
+// Default Google Sheet Web App URL — invoices sync here automatically.
+// Change this if you ever redeploy the Apps Script and get a new URL.
+const DEFAULT_GSHEET_URL = 'https://script.google.com/macros/s/AKfycbyFGYUr8SiUyABI4jICVry20RZUwbNHjjwjJD48e6WhUtPGfv9Zy_LrNbbSC4Ft4nnk/exec';
+
+// ---------- login gate ----------
+// NOTE: this is a simple front-end gate for basic access control, not
+// true security — the credentials below are visible to anyone who views
+// this page's source code. Do not rely on this alone to protect sensitive
+// data; consider Vercel's built-in deployment password protection for
+// stronger access control.
+const ADMIN_USER = 'admin';
+const ADMIN_PASS = 'Faiyaz8842@';
+
+function checkAuth(){
+  if(sessionStorage.getItem('ci_authed')==='true'){
+    document.getElementById('login_overlay').style.display = 'none';
+  }
+}
+function attemptLogin(){
+  const u = document.getElementById('login_user').value.trim();
+  const p = document.getElementById('login_pass').value;
+  const err = document.getElementById('login_error');
+  if(u===ADMIN_USER && p===ADMIN_PASS){
+    sessionStorage.setItem('ci_authed','true');
+    document.getElementById('login_overlay').style.display = 'none';
+    err.textContent = '';
+  }else{
+    err.textContent = 'Incorrect username or password.';
+  }
+}
+document.getElementById('login_btn').addEventListener('click', attemptLogin);
+document.getElementById('login_pass').addEventListener('keydown', e=>{ if(e.key==='Enter') attemptLogin(); });
+document.getElementById('login_user').addEventListener('keydown', e=>{ if(e.key==='Enter') attemptLogin(); });
+document.getElementById('logout_link').addEventListener('click', ()=>{
+  sessionStorage.removeItem('ci_authed');
+  location.reload();
+});
+checkAuth();
+
+let items = [
+  {desc:'', hs:'', qty:1, price:0}
+];
+let logoData = null; // {dataUrl, w, h}
+
+// ---------- persistence: seller details ----------
+const EXPORTER_FIELDS = ['exp_name','exp_addr','exp_gstin','exp_iec','exp_lut','exp_mobile','exp_email'];
+function loadExporter(){
+  try{
+    const saved = JSON.parse(localStorage.getItem('ci_exporter')||'{}');
+    EXPORTER_FIELDS.forEach(id=>{ if(saved[id]!==undefined) document.getElementById(id).value = saved[id]; });
+  }catch(e){}
+}
+function saveExporter(){
+  const data = {};
+  EXPORTER_FIELDS.forEach(id=>{ data[id] = document.getElementById(id).value; });
+  localStorage.setItem('ci_exporter', JSON.stringify(data));
+}
+
+// ---------- persistence: logo ----------
+function loadLogo(){
+  try{
+    const saved = JSON.parse(localStorage.getItem('ci_logo')||'null');
+    if(saved){ logoData = saved; showLogoPreview(); }
+  }catch(e){}
+}
+function showLogoPreview(){
+  const img = document.getElementById('logo_preview');
+  const ph = document.getElementById('logo_placeholder');
+  if(logoData){
+    img.src = logoData.dataUrl; img.style.display='block'; ph.style.display='none';
+  }else{
+    img.style.display='none'; ph.style.display='flex';
+  }
+}
+document.getElementById('logo_upload').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = reader.result;
+    const imgEl = new Image();
+    imgEl.onload = () => {
+      logoData = {dataUrl, w:imgEl.naturalWidth, h:imgEl.naturalHeight};
+      localStorage.setItem('ci_logo', JSON.stringify(logoData));
+      showLogoPreview();
+      renderPreview();
+    };
+    imgEl.src = dataUrl;
+  };
+  reader.readAsDataURL(file);
+});
+document.getElementById('remove_logo').addEventListener('click', ()=>{
+  logoData = null;
+  localStorage.removeItem('ci_logo');
+  document.getElementById('logo_upload').value = '';
+  showLogoPreview();
+  renderPreview();
+});
+
+// ---------- items UI ----------
+function renderItemRows(){
+  const c = document.getElementById('items_container');
+  c.innerHTML = '';
+  items.forEach((it, idx)=>{
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.innerHTML = `
+      <input type="text" placeholder="Description of goods" data-field="desc" data-idx="${idx}" value="${escapeAttr(it.desc)}">
+      <input type="text" placeholder="HS Code" data-field="hs" data-idx="${idx}" value="${escapeAttr(it.hs)}">
+      <input type="number" min="0" placeholder="Qty" data-field="qty" data-idx="${idx}" value="${it.qty}">
+      <input type="number" min="0" step="0.01" placeholder="Unit Price (INR)" data-field="price" data-idx="${idx}" value="${it.price}">
+      <button class="rm-btn" data-rm="${idx}" type="button" title="Remove">✕</button>
+    `;
+    c.appendChild(row);
+  });
+  c.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const idx = +e.target.dataset.idx;
+      const field = e.target.dataset.field;
+      items[idx][field] = (field==='qty'||field==='price') ? (parseFloat(e.target.value)||0) : e.target.value;
+      renderPreview();
+    });
+  });
+  c.querySelectorAll('[data-rm]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const idx = +e.target.dataset.rm;
+      if(items.length>1){ items.splice(idx,1); renderItemRows(); renderPreview(); }
+    });
+  });
+}
+document.getElementById('add_item').addEventListener('click', ()=>{
+  items.push({desc:'', hs:'', qty:1, price:0});
+  renderItemRows();
+  renderPreview();
+});
+
+function escapeAttr(s){ return (s||'').replace(/"/g,'&quot;'); }
+function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ---------- currency / amount method ----------
+document.getElementById('inv_currency').addEventListener('change', onCurrencyOrMethodChange);
+document.getElementById('inv_method').addEventListener('change', onCurrencyOrMethodChange);
+document.getElementById('inv_rate').addEventListener('input', renderPreview);
+document.getElementById('inv_manual_amount').addEventListener('input', renderPreview);
+
+function onCurrencyOrMethodChange(){
+  const cur = document.getElementById('inv_currency').value;
+  const method = document.getElementById('inv_method').value;
+  const methodField = document.getElementById('method_field');
+  const rateField = document.getElementById('rate_field');
+  const manualField = document.getElementById('manual_field');
+
+  if(cur==='NONE'){
+    methodField.style.display='none'; rateField.style.display='none'; manualField.style.display='none';
+  } else {
+    methodField.style.display='block';
+    document.getElementById('rate_currency_lbl').textContent = cur;
+    document.getElementById('manual_currency_lbl').textContent = cur;
+    if(method==='rate'){
+      rateField.style.display='block'; manualField.style.display='none';
+      document.getElementById('inv_rate').value = FALLBACK_RATES[cur] || 0.012;
+      fetchLiveRate();
+    } else {
+      rateField.style.display='none'; manualField.style.display='block';
+    }
+  }
+  renderPreview();
+}
+
+async function fetchLiveRate(){
+  const cur = document.getElementById('inv_currency').value;
+  if(cur==='NONE' || document.getElementById('inv_method').value!=='rate') return;
+  const statusEl = document.getElementById('rate_status');
+  statusEl.textContent = 'Fetching live rate…';
+  statusEl.className = 'rate-status';
+  try{
+    const res = await fetch('https://open.er-api.com/v6/latest/INR');
+    const data = await res.json();
+    if(data && data.rates && data.rates[cur]){
+      document.getElementById('inv_rate').value = data.rates[cur];
+      statusEl.textContent = 'Live rate fetched just now.';
+      statusEl.className = 'rate-status ok';
+    }else{
+      throw new Error('missing rate');
+    }
+  }catch(e){
+    statusEl.textContent = 'Could not fetch live rate — using fallback / manual value.';
+    statusEl.className = 'rate-status err';
+  }
+  renderPreview();
+}
+document.getElementById('refresh_rate').addEventListener('click', fetchLiveRate);
+
+// ---------- form state ----------
+function getFormState(){
+  const g = id => document.getElementById(id).value;
+  return {
+    exp: {name:g('exp_name'), addr:g('exp_addr'), gstin:g('exp_gstin'), iec:g('exp_iec'), lut:g('exp_lut'), mobile:g('exp_mobile'), email:g('exp_email')},
+    con: {name:g('con_name'), addr:g('con_addr'), country:g('con_country')},
+    inv: {no:g('inv_no'), date:g('inv_date'), ref:g('inv_ref'), currency:g('inv_currency'), method:g('inv_method'), rate:parseFloat(g('inv_rate'))||0, manualAmount:parseFloat(g('inv_manual_amount'))||0},
+    declaration: g('declaration')
+  };
+}
+
+function computeTotals(state){
+  const totalInr = items.reduce((s,it)=> s + (it.qty*it.price), 0);
+  let totalForeign = null;
+  if(state.inv.currency!=='NONE'){
+    totalForeign = state.inv.method==='manual' ? state.inv.manualAmount : totalInr * state.inv.rate;
+  }
+  return {totalInr, totalForeign};
+}
+
+function formatDate(d){
+  if(!d) return '—';
+  const dt = new Date(d+'T00:00:00');
+  if(isNaN(dt)) return d;
+  return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}).toUpperCase().replace(/ /g,'-');
+}
+function monthName(d){
+  if(!d) return '';
+  const dt = new Date(d+'T00:00:00');
+  if(isNaN(dt)) return '';
+  return dt.toLocaleString('en-US',{month:'long'});
+}
+
+// ---------- preview ----------
+function renderPreview(){
+  const state = getFormState();
+  const {totalInr, totalForeign} = computeTotals(state);
+  const sym = CURRENCY_SYMBOL[state.inv.currency] || '';
+
+  const rows = items.map(it=>{
+    const total = (it.qty*it.price);
+    return `<tr>
+      <td>${escapeHtml(it.desc) || '<span class="empty-hint">Item description</span>'}</td>
+      <td>${escapeHtml(it.hs)||'—'}</td>
+      <td class="num">${it.qty||0}</td>
+      <td class="num">₹${(it.price||0).toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+      <td class="num">₹${total.toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+    </tr>`;
+  }).join('');
+
+  const totalsHtml = state.inv.currency==='NONE'
+    ? `<div class="totals-cols"><div class="totals-card"><div class="k">Total (INR)</div><div class="v">₹${totalInr.toLocaleString('en-IN',{minimumFractionDigits:2})}</div></div></div>`
+    : `<div class="totals-cols">
+         <div class="totals-card"><div class="k">Total (${state.inv.currency})</div><div class="v">${sym}${(totalForeign||0).toLocaleString('en-US',{minimumFractionDigits:2})}</div></div>
+         <div class="totals-card"><div class="k">Total (INR)</div><div class="v">₹${totalInr.toLocaleString('en-IN',{minimumFractionDigits:2})}</div></div>
+       </div>`;
+
+  const paper = document.getElementById('paper');
+  paper.innerHTML = `
+    <div class="doc-header">
+      ${logoData ? `<img src="${logoData.dataUrl}">` : ''}
+      <h1 class="doc-title">Commercial Invoice</h1>
+    </div>
+    <p class="doc-sub">Export Documentation · ${state.inv.currency!=='NONE' ? state.inv.currency+' / INR' : 'INR'}</p>
+
+    <div class="parties">
+      <div class="party">
+        <h3>Seller</h3>
+        <div class="name">${escapeHtml(state.exp.name) || '<span class="empty-hint">Your company name</span>'}</div>
+        <div class="line">${escapeHtml(state.exp.addr).replace(/\n/g,'<br>')}</div>
+        <div class="meta">
+          ${state.exp.gstin ? 'GSTIN: '+escapeHtml(state.exp.gstin)+'<br>' : ''}
+          ${state.exp.iec ? 'IEC: '+escapeHtml(state.exp.iec)+'<br>' : ''}
+          ${state.exp.lut ? 'LUT ARN: '+escapeHtml(state.exp.lut)+'<br>' : ''}
+          ${state.exp.mobile ? 'Mobile: '+escapeHtml(state.exp.mobile)+'<br>' : ''}
+          ${state.exp.email ? 'Email: '+escapeHtml(state.exp.email) : ''}
+        </div>
+      </div>
+      <div class="party">
+        <h3>Consignee</h3>
+        <div class="name">${escapeHtml(state.con.name) || '<span class="empty-hint">Buyer name</span>'}</div>
+        <div class="line">${escapeHtml(state.con.addr).replace(/\n/g,'<br>')}${state.con.country ? '<br>'+escapeHtml(state.con.country) : ''}</div>
+      </div>
+    </div>
+
+    <div class="meta-strip">
+      <div><span class="k">Invoice No.</span><span class="v">${escapeHtml(state.inv.no)||'—'}</span></div>
+      <div><span class="k">Invoice Date</span><span class="v">${formatDate(state.inv.date)}</span></div>
+      <div><span class="k">Order Reference</span><span class="v">${escapeHtml(state.inv.ref)||'—'}</span></div>
+    </div>
+
+    <table class="items-table">
+      <thead><tr>
+        <th>Description of Goods</th><th>HS Code</th><th class="num">Qty</th><th class="num">Unit Price (INR)</th><th class="num">Total (INR)</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+
+    ${totalsHtml}
+
+    <div class="declaration"><b>Declaration:</b> ${escapeHtml(state.declaration)}</div>
+    <div class="footer-note">This is a system-generated invoice and does not require a physical signature.</div>
+  `;
+}
+
+// ---------- Google Sheet sync (runs silently in the background) ----------
+function buildRecord(state, totalInr, totalForeign){
+  return {
+    'Invoice No': state.inv.no,
+    'Invoice Date': state.inv.date,
+    'Order Reference': state.inv.ref,
+    'Buyer Name': state.con.name,
+    'Buyer Country': state.con.country,
+    'Currency': state.inv.currency,
+    'Amount Method': state.inv.currency==='NONE' ? '-' : state.inv.method,
+    'Exchange Rate': state.inv.currency!=='NONE' && state.inv.method==='rate' ? state.inv.rate : '',
+    'Total (Foreign Currency)': state.inv.currency==='NONE' ? '' : totalForeign,
+    'Total (INR)': totalInr,
+    'Line Items': items.length,
+    'Generated At': new Date().toLocaleString()
+  };
+}
+
+async function pushToGoogleSheet(record){
+  if(!DEFAULT_GSHEET_URL){ return; }
+  try{
+    // no-cors: Apps Script web apps don't return CORS headers, so the
+    // response is opaque — we can't read it, but the write still happens.
+    await fetch(DEFAULT_GSHEET_URL, {
+      method:'POST',
+      mode:'no-cors',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify(record)
+    });
+    console.log('Invoice synced to Google Sheet.');
+  }catch(e){
+    console.warn('Could not sync invoice to Google Sheet:', e);
+  }
+}
+
+// ---------- PDF generation ----------
+function getImageFormat(dataUrl){
+  if(dataUrl.indexOf('image/png')>-1) return 'PNG';
+  if(dataUrl.indexOf('image/jpeg')>-1 || dataUrl.indexOf('image/jpg')>-1) return 'JPEG';
+  return 'PNG';
+}
+
+function generatePDF(){
+  const state = getFormState();
+  const {totalInr, totalForeign} = computeTotals(state);
+  const sym = CURRENCY_SYMBOL[state.inv.currency] || '';
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:'pt', format:'a4'}); // A4 page
+  const pageW = doc.internal.pageSize.getWidth();
+  const margin = 42;
+  let y = 50;
+
+  // header: logo (left) + title (right of logo)
+  let titleX = margin;
+  if(logoData){
+    const logoH = 46;
+    const logoW = Math.min(120, logoH * (logoData.w / logoData.h));
+    try{ doc.addImage(logoData.dataUrl, getImageFormat(logoData.dataUrl), margin, y-32, logoW, logoH); }catch(e){}
+    titleX = margin + logoW + 14;
+  }
+  doc.setFont('helvetica','bold'); doc.setFontSize(20);
+  doc.text('COMMERCIAL INVOICE', titleX, y);
+  y += 26;
+
+  doc.setDrawColor(180); doc.line(margin, y, pageW-margin, y);
+  y += 22;
+
+  const colW = (pageW - margin*2 - 20)/2;
+  doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  doc.text('SELLER', margin, y);
+  doc.text('CONSIGNEE', margin+colW+20, y);
+  y += 14;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text(state.exp.name || '-', margin, y);
+  doc.text(state.con.name || '-', margin+colW+20, y);
+  y += 14;
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+  const expAddrLines = doc.splitTextToSize(state.exp.addr || '-', colW);
+  const conAddrLines = doc.splitTextToSize((state.con.addr||'-') + (state.con.country ? '\n'+state.con.country : ''), colW);
+  doc.text(expAddrLines, margin, y);
+  doc.text(conAddrLines, margin+colW+20, y);
+
+  const expBlockLines = [];
+  if(state.exp.gstin) expBlockLines.push('GSTIN: '+state.exp.gstin);
+  if(state.exp.iec) expBlockLines.push('IEC CODE: '+state.exp.iec);
+  if(state.exp.lut) expBlockLines.push('LUT ARN: '+state.exp.lut);
+  if(state.exp.mobile) expBlockLines.push('Mobile: '+state.exp.mobile);
+  if(state.exp.email) expBlockLines.push('Email: '+state.exp.email);
+
+  let yAfterAddr = y + expAddrLines.length*11 + 8;
+  let yAfterAddrCon = y + conAddrLines.length*11 + 8;
+  doc.setFont('courier','normal'); doc.setFontSize(8.5);
+  doc.text(expBlockLines, margin, yAfterAddr);
+
+  y = Math.max(yAfterAddr + expBlockLines.length*11, yAfterAddrCon) + 20;
+
+  // meta strip
+  doc.setDrawColor(210); doc.setFillColor(245,240,228);
+  doc.roundedRect(margin, y, pageW-margin*2, 40, 3, 3, 'FD');
+  const metaColW = (pageW-margin*2)/3;
+  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(120,105,80);
+  doc.text('INVOICE NO.', margin+12, y+15);
+  doc.text('INVOICE DATE', margin+metaColW+12, y+15);
+  doc.text('ORDER REFERENCE', margin+metaColW*2+12, y+15);
+  doc.setFont('courier','bold'); doc.setFontSize(10.5); doc.setTextColor(30,25,18);
+  doc.text(state.inv.no || '-', margin+12, y+30);
+  doc.text(formatDate(state.inv.date), margin+metaColW+12, y+30);
+  doc.text(state.inv.ref || '-', margin+metaColW*2+12, y+30);
+  doc.setTextColor(0,0,0);
+  y += 60;
+
+  // items table
+  const body = items.map(it=>{
+    const total = it.qty*it.price;
+    return [it.desc||'-', it.hs||'-', String(it.qty||0), (it.price||0).toLocaleString('en-IN',{minimumFractionDigits:2}), total.toLocaleString('en-IN',{minimumFractionDigits:2})];
+  });
+  doc.autoTable({
+    startY: y,
+    margin:{left:margin,right:margin},
+    head: [['Description of Goods','HS Code','Qty','Unit Price (INR)','Total (INR)']],
+    body: body,
+    styles:{font:'helvetica', fontSize:9.5, cellPadding:6, textColor:[40,32,24]},
+    headStyles:{fillColor:[58,42,28], textColor:[237,226,205], fontStyle:'bold'},
+    columnStyles:{2:{halign:'right'},3:{halign:'right'},4:{halign:'right'}},
+    theme:'grid'
+  });
+  y = doc.lastAutoTable.finalY + 22;
+
+  // totals: foreign currency LEFT, INR RIGHT
+  const cardW = state.inv.currency==='NONE' ? (pageW-margin*2) : (pageW-margin*2-16)/2;
+  doc.setDrawColor(30,25,18); doc.setLineWidth(1.2);
+  if(state.inv.currency!=='NONE'){
+    doc.roundedRect(margin, y, cardW, 46, 3, 3);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(120,105,80);
+    doc.text('TOTAL (' + state.inv.currency + ')', margin+12, y+17);
+    doc.setFont('courier','bold'); doc.setFontSize(15); doc.setTextColor(20,16,10);
+    doc.text(sym + (totalForeign||0).toLocaleString('en-US',{minimumFractionDigits:2}), margin+12, y+37);
+
+    doc.roundedRect(margin+cardW+16, y, cardW, 46, 3, 3);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(120,105,80);
+    doc.text('TOTAL (INR)', margin+cardW+16+12, y+17);
+    doc.setFont('courier','bold'); doc.setFontSize(15); doc.setTextColor(20,16,10);
+    doc.text('Rs. ' + totalInr.toLocaleString('en-IN',{minimumFractionDigits:2}), margin+cardW+16+12, y+37);
+  } else {
+    doc.roundedRect(margin, y, cardW, 46, 3, 3);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(120,105,80);
+    doc.text('TOTAL (INR)', margin+12, y+17);
+    doc.setFont('courier','bold'); doc.setFontSize(15); doc.setTextColor(20,16,10);
+    doc.text('Rs. ' + totalInr.toLocaleString('en-IN',{minimumFractionDigits:2}), margin+12, y+37);
+  }
+  doc.setTextColor(0,0,0);
+  y += 46 + 26;
+
+  // declaration
+  doc.setDrawColor(220); doc.setLineWidth(0.75); doc.line(margin, y, pageW-margin, y);
+  y += 16;
+  doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  doc.text('Declaration:', margin, y);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  const declLines = doc.splitTextToSize(state.declaration || '', pageW-margin*2 - 60);
+  doc.text(declLines, margin+58, y);
+  y += declLines.length*12 + 20;
+
+  doc.setFont('helvetica','italic'); doc.setFontSize(8.5); doc.setTextColor(120,105,80);
+  doc.text('This is a system-generated invoice and does not require a physical signature.', pageW/2, y, {align:'center'});
+
+  // filename: "InvoiceNo-Month" e.g. Retail00006-July
+  const invNoPart = (state.inv.no ? state.inv.no.replace(/[^a-z0-9\-_]/gi,'_') : 'commercial_invoice');
+  const mo = monthName(state.inv.date);
+  const filename = invNoPart + (mo ? '-'+mo : '') + '.pdf';
+  doc.save(filename);
+
+  // sync this invoice to the Google Sheet (sole persistent record)
+  pushToGoogleSheet(buildRecord(state, totalInr, totalForeign));
+}
+
+document.getElementById('generate_pdf').addEventListener('click', generatePDF);
+
+// save seller details on any change within that section
+document.querySelectorAll('.panel input, .panel textarea, .panel select').forEach(el=>{
+  if(el.id==='logo_upload') return;
+  el.addEventListener('input', ()=>{ saveExporter(); renderPreview(); });
+  el.addEventListener('change', ()=>{ saveExporter(); renderPreview(); });
+});
+
+// ---------- init ----------
+function init(){
+  loadExporter();
+  loadLogo();
+  document.getElementById('inv_date').value = new Date().toISOString().slice(0,10);
+  renderItemRows();
+  onCurrencyOrMethodChange();
+  renderPreview();
+}
+init();
+</script>
+</body>
+</html>
