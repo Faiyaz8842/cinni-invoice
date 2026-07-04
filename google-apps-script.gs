@@ -27,25 +27,48 @@ function doPost(e) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Invoices') || ss.insertSheet('Invoices');
 
-  var data = JSON.parse(e.postData.contents);
+  var data = {};
+  try {
+    data = JSON.parse(e.postData.contents || '{}');
+  } catch (err) {
+    data = e.parameter || {};
+  }
 
   var headers = [
-    'Invoice No', 'Invoice Date', 'Order Reference', 'Buyer Name',
-    'Buyer Country', 'Currency', 'Amount Method', 'Exchange Rate',
-    'Total (Foreign Currency)', 'Total (INR)', 'Line Items', 'Generated At'
+    'Invoice No',
+    'Invoice Date',
+    'Order Reference',
+    'Buyer Name',
+    'Buyer Add',
+    'Buyer Country',
+    'Currency',
+    'Total (Foreign Currency)',
+    'Total (INR)',
+    'Line Items',
+    'Created by',
+    'Generated At'
   ];
 
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(headers);
     sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  } else {
+    var existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+    headers.forEach(function (header) {
+      if (existingHeaders.indexOf(header) === -1) {
+        sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header).setFontWeight('bold');
+      }
+    });
   }
 
-  // find an existing row with the same Invoice No and overwrite it,
-  // otherwise append a new row — mirrors the tool's local-storage behavior
+  var currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var invoiceNoCol = currentHeaders.indexOf('Invoice No') + 1;
   var lastRow = sheet.getLastRow();
   var existingRow = -1;
-  if (lastRow > 1) {
-    var invoiceNos = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+
+  if (lastRow > 1 && invoiceNoCol > 0) {
+    var invoiceNos = sheet.getRange(2, invoiceNoCol, lastRow - 1, 1).getValues();
     for (var i = 0; i < invoiceNos.length; i++) {
       if (String(invoiceNos[i][0]) === String(data['Invoice No'])) {
         existingRow = i + 2;
@@ -54,8 +77,8 @@ function doPost(e) {
     }
   }
 
-  var row = headers.map(function (h) {
-    return data[h] !== undefined ? data[h] : '';
+  var row = currentHeaders.map(function (header) {
+    return data[header] !== undefined ? data[header] : '';
   });
 
   if (existingRow > -1) {
