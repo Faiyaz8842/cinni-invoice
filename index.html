@@ -369,7 +369,7 @@ const FALLBACK_RATES = {USD:0.0120,GBP:0.0095,EUR:0.0110,CAD:0.0165,AUD:0.0182,N
 
 // Default Google Sheet Web App URL — invoices sync here automatically.
 // Change this if you ever redeploy the Apps Script and get a new URL.
-const DEFAULT_GSHEET_URL = 'https://script.google.com/macros/s/AKfycbyh5Q5xKSYUvOc2SvZ_Z3pNkgDKjsxHZeVfFffgfE8jnTc-m__7dI0lJEQb7OTau72p/exec';
+const DEFAULT_GSHEET_URL = 'https://script.google.com/macros/s/AKfycbwQaYVlmN2QycaO9m72mCE97chl2s4MNsSX9oZScL0VQYjDb84EnT28LcbfoF68kwNh/exec';
 
 // ---------- login gate ----------
 // NOTE: this is a simple front-end gate for basic access control, not
@@ -381,9 +381,7 @@ const DEFAULT_GSHEET_URL = 'https://script.google.com/macros/s/AKfycbyh5Q5xKSYUv
 // To add or remove users, edit this list — each entry is 'username': 'password'.
 const USERS = {
   'Faiyaz': 'Faiyaz8842@',
-  'Danish': 'Danish1234',
-  'Aajam':  'Aajam1234@',// <-- example second user, edit or remove
-  'Sania':  'Sania1234@'
+  'Danish': 'Danish1234'   // <-- example second user, edit or remove
 };
 
 function checkAuth(){
@@ -843,10 +841,10 @@ async function generatePDF(){
   y += 22;
 
   const colW = (pageW - margin*2 - 20)/2;
-  doc.setFont('helvetica','bold'); doc.setFontSize(9);
-  doc.text('SELLER', margin, y);
-  doc.text('CONSIGNEE', margin+colW+20, y);
-  y += 14;
+  doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  doc.text('Seller Details:', margin, y);
+  doc.text('Consignee Details:', margin+colW+20, y);
+  y += 18;
 
   doc.setFont('helvetica','bold'); doc.setFontSize(11);
   doc.text(state.exp.name || '-', margin, y);
