@@ -263,13 +263,13 @@
     <div class="brand">
       <span class="stitch-dot"></span>
       <div>
-        <h1>Invoice Studio</h1>
+        <h1>Cinni Invoice Studio</h1>
         <p>Commercial Invoice Generator</p>
       </div>
     </div>
 
     <div class="section">
-      <h2>Seller</h2>
+      <h2>Seller Details</h2>
       <div class="field"><label>Company Name</label><input id="exp_name" type="text" placeholder="Cinni Enterprises"></div>
       <div class="field"><label>Address</label><textarea id="exp_addr" placeholder="131/5 C 1 A Begum Purwa&#10;Kanpur, UP – 208023, India"></textarea></div>
       <div class="row2">
@@ -284,7 +284,7 @@
     </div>
 
     <div class="section">
-      <h2>Consignee</h2>
+      <h2>Consignee Details</h2>
       <div class="field"><label>Name</label><input id="con_name" type="text" placeholder="Michael Urueta"></div>
       <div class="field"><label>Address</label><textarea id="con_addr" placeholder="17 Scarlett St&#10;Greenville, SC 29607-2826"></textarea></div>
       <div class="field"><label>Country</label><input id="con_country" type="text" placeholder="United States"></div>
@@ -649,7 +649,7 @@ function renderPreview(){
 
     <div class="parties">
       <div class="party">
-        <h3>Seller</h3>
+        <h3>Seller Details</h3>
         <div class="name">${escapeHtml(state.exp.name) || '<span class="empty-hint">Your company name</span>'}</div>
         <div class="line">${escapeHtml(state.exp.addr).replace(/\n/g,'<br>')}</div>
         <div class="meta">
@@ -661,7 +661,7 @@ function renderPreview(){
         </div>
       </div>
       <div class="party">
-        <h3>Consignee</h3>
+        <h3>Consignee Details</h3>
         <div class="name">${escapeHtml(state.con.name) || '<span class="empty-hint">Buyer name</span>'}</div>
         <div class="line">${escapeHtml(state.con.addr).replace(/\n/g,'<br>')}${state.con.country ? '<br>'+escapeHtml(state.con.country) : ''}</div>
       </div>
