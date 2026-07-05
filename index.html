@@ -340,7 +340,7 @@ const FALLBACK_RATES = {USD:0.0120,GBP:0.0095,EUR:0.0110,CAD:0.0165,AUD:0.0182,N
 
 // Default Google Sheet Web App URL — invoices sync here automatically.
 // Change this if you ever redeploy the Apps Script and get a new URL.
-const DEFAULT_GSHEET_URL = 'https://script.google.com/macros/s/AKfycbziLdT-voV7U0u1sQ6vAZxFMUd1sQs5vg1DKnzD1uurJXS0mSfiz91Fb3c2IIvykeED/exec';
+const DEFAULT_GSHEET_URL = 'https://script.google.com/macros/s/AKfycbwQaYVlmN2QycaO9m72mCE97chl2s4MNsSX9oZScL0VQYjDb84EnT28LcbfoF68kwNh/exec';
 
 // ---------- login gate ----------
 // NOTE: this is a simple front-end gate for basic access control, not
@@ -651,9 +651,20 @@ function renderPreview(){
 }
 
 // ---------- Google Sheet sync (runs silently in the background) ----------
+function sheetLines(mapper){
+  return items.map((it, idx)=>{
+    const value = mapper(it, idx);
+    return value === undefined || value === null || value === '' ? '-' : String(value);
+  }).join('\n');
+}
+
 function buildRecord(state, totalInr, totalForeign){
   const createdBy = sessionStorage.getItem('ci_authed_user') || '';
   const buyerAdd = state.con.addr || '';
+  const productDetails = sheetLines(it => it.desc);
+  const hsnCodes = sheetLines(it => it.hs);
+  const quantities = sheetLines(it => Number.isFinite(it.qty) ? it.qty : 0);
+  const unitPrices = sheetLines(it => Number.isFinite(it.price) ? it.price.toFixed(2) : '0.00');
   return {
     'Invoice No': state.inv.no,
     'Invoice Date': state.inv.date,
@@ -661,6 +672,10 @@ function buildRecord(state, totalInr, totalForeign){
     'Buyer Name': state.con.name,
     'Buyer Add': buyerAdd,
     'Buyer Country': state.con.country,
+    'Product Details': productDetails,
+    'HSN Code': hsnCodes,
+    'Quantity': quantities,
+    'Unit Price (INR)': unitPrices,
     'Currency': state.inv.currency,
     'Total (Foreign Currency)': state.inv.currency==='NONE' ? '' : totalForeign,
     'Total (INR)': totalInr,
