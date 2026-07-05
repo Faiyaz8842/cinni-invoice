@@ -76,7 +76,7 @@
   }
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 
-  input[type=text],input[type=number],input[type=date],textarea,select{
+  input[type=text],input[type=password],input[type=number],input[type=date],textarea,select{
     width:100%;background:rgba(0,0,0,0.22);border:1px solid rgba(201,161,95,0.3);
     color:var(--cream);padding:9px 10px;border-radius:var(--radius);font-family:'IBM Plex Sans',sans-serif;
     font-size:13.5px;outline:none;transition:border-color .15s,background .15s;
@@ -201,6 +201,22 @@
     border:1px solid rgba(201,161,95,0.3);border-radius:8px;padding:36px 32px;box-shadow:0 25px 60px rgba(0,0,0,0.5);
   }
   .login-card .brand{justify-content:center;margin-bottom:22px;}
+  .login-card .brand h1{text-align:center;}
+  .login-logo{
+    display:block;width:86px;height:86px;object-fit:contain;margin:0 auto 16px;
+    border-radius:6px;background:rgba(0,0,0,0.14);padding:8px;border:1px solid rgba(201,161,95,0.25);
+  }
+  .password-wrap{position:relative;}
+  .password-wrap input{padding-right:42px;}
+  .password-toggle{
+    position:absolute;right:8px;top:50%;transform:translateY(-50%);width:28px;height:28px;
+    display:flex;align-items:center;justify-content:center;background:transparent;border:none;
+    color:var(--cream-dim);cursor:pointer;border-radius:4px;padding:0;
+  }
+  .password-toggle:hover{color:var(--brass-bright);background:rgba(201,161,95,0.08);}
+  .password-toggle svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+  .password-toggle .eye-slash{display:none;}
+  .password-toggle.is-visible .eye-slash{display:block;}
   .login-error{color:#d98a80;font-size:12px;text-align:center;margin-top:12px;min-height:14px;}
   .logout-link{
     display:block;text-align:right;font-size:11px;color:var(--cream-dim);text-decoration:underline;
@@ -212,15 +228,28 @@
 
 <div id="login_overlay" class="login-overlay">
   <div class="login-card">
+    <img class="login-logo" src="./logo.jpeg" alt="Cinni logo">
     <div class="brand">
       <span class="stitch-dot"></span>
       <div>
-        <h1>Invoice Studio</h1>
+        <h1>Cinni Invoice Studio</h1>
         <p>Restricted Access</p>
       </div>
     </div>
     <div class="field"><label>Username</label><input id="login_user" type="text" autocomplete="username"></div>
-    <div class="field"><label>Password</label><input id="login_pass" type="password" autocomplete="current-password"></div>
+    <div class="field">
+      <label>Password</label>
+      <div class="password-wrap">
+        <input id="login_pass" type="password" autocomplete="current-password">
+        <button class="password-toggle" id="toggle_password" type="button" aria-label="Show password">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+            <path class="eye-slash" d="M4 20L20 4"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
     <button class="generate-btn" id="login_btn" type="button" style="margin-top:6px;">Log In</button>
     <p class="login-error" id="login_error"></p>
   </div>
@@ -340,7 +369,7 @@ const FALLBACK_RATES = {USD:0.0120,GBP:0.0095,EUR:0.0110,CAD:0.0165,AUD:0.0182,N
 
 // Default Google Sheet Web App URL — invoices sync here automatically.
 // Change this if you ever redeploy the Apps Script and get a new URL.
-const DEFAULT_GSHEET_URL = 'https://script.google.com/macros/s/AKfycbyMWbf0yDYHEhlL3Uyk_R35cquePseDzmRY-XGPvKNM25QzZWoAb2Z6fnKx4ot-ZpUk/exec';
+const DEFAULT_GSHEET_URL = 'https://script.google.com/macros/s/AKfycbwQaYVlmN2QycaO9m72mCE97chl2s4MNsSX9oZScL0VQYjDb84EnT28LcbfoF68kwNh/exec';
 
 // ---------- login gate ----------
 // NOTE: this is a simple front-end gate for basic access control, not
@@ -380,6 +409,14 @@ function attemptLogin(){
 document.getElementById('login_btn').addEventListener('click', attemptLogin);
 document.getElementById('login_pass').addEventListener('keydown', e=>{ if(e.key==='Enter') attemptLogin(); });
 document.getElementById('login_user').addEventListener('keydown', e=>{ if(e.key==='Enter') attemptLogin(); });
+document.getElementById('toggle_password').addEventListener('click', ()=>{
+  const pass = document.getElementById('login_pass');
+  const toggle = document.getElementById('toggle_password');
+  const showPassword = pass.type === 'password';
+  pass.type = showPassword ? 'text' : 'password';
+  toggle.classList.toggle('is-visible', showPassword);
+  toggle.setAttribute('aria-label', showPassword ? 'Hide password' : 'Show password');
+});
 document.getElementById('logout_link').addEventListener('click', ()=>{
   sessionStorage.removeItem('ci_authed');
   sessionStorage.removeItem('ci_authed_user');
