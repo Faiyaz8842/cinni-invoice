@@ -17,8 +17,8 @@
     --brass-bright:#e0bc7f;
     --cream:#ede2cd;
     --cream-dim:#c9bda6;
-    --paper:#fbf7ef;
-    --paper-line:#e4dac5;
+    --paper:#ffffff;
+    --paper-line:#e5e7eb;
     --ink:#2a2118;
     --danger:#a5453a;
     --radius:6px;
@@ -160,7 +160,7 @@
   .party .meta{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6b5d48;margin-top:6px;}
 
   .meta-strip{
-    display:grid;grid-template-columns:repeat(3,1fr);gap:14px;background:#f2ead9;border:1px solid var(--paper-line);
+    display:grid;grid-template-columns:repeat(3,1fr);gap:14px;background:#f8fafc;border:1px solid var(--paper-line);
     border-radius:4px;padding:12px 16px;margin-bottom:24px;
   }
   .meta-strip div span{display:block;}
@@ -369,7 +369,7 @@ const FALLBACK_RATES = {USD:0.0120,GBP:0.0095,EUR:0.0110,CAD:0.0165,AUD:0.0182,N
 
 // Default Google Sheet Web App URL — invoices sync here automatically.
 // Change this if you ever redeploy the Apps Script and get a new URL.
-const DEFAULT_GSHEET_URL = 'https://script.google.com/macros/s/AKfycbwQaYVlmN2QycaO9m72mCE97chl2s4MNsSX9oZScL0VQYjDb84EnT28LcbfoF68kwNh/exec';
+const DEFAULT_GSHEET_URL = 'https://script.google.com/macros/s/AKfycby5eOIk86CuEOG-ZbvhoDVZ6WmCUeYyXavpGku6lzgABJH6AjGbtgeoUsk7vf4pFaRz/exec';
 
 // ---------- login gate ----------
 // NOTE: this is a simple front-end gate for basic access control, not
@@ -729,15 +729,15 @@ async function pushToGoogleSheet(record){
     Object.entries(record).forEach(([key, value])=>{
       params.append(key, value == null ? '' : String(value));
     });
-    const sheetUrl = DEFAULT_GSHEET_URL + (DEFAULT_GSHEET_URL.includes('?') ? '&' : '?') + params.toString();
 
     // no-cors: Apps Script web apps don't return CORS headers, so the
     // response is opaque — we can't read it, but the write still happens.
-    await fetch(sheetUrl, {
+    await fetch(DEFAULT_GSHEET_URL, {
       method:'POST',
       mode:'no-cors',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify(record)
+      keepalive:true,
+      headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
+      body: params.toString()
     });
     console.log('Invoice synced to Google Sheet.');
   }catch(e){
