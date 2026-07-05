@@ -41,6 +41,10 @@ function doPost(e) {
     'Buyer Name',
     'Buyer Add',
     'Buyer Country',
+    'Product Details',
+    'HSN Code',
+    'Quantity',
+    'Unit Price (INR)',
     'Currency',
     'Total (Foreign Currency)',
     'Total (INR)',
@@ -83,8 +87,10 @@ function doPost(e) {
 
   if (existingRow > -1) {
     sheet.getRange(existingRow, 1, 1, row.length).setValues([row]);
+    sheet.getRange(existingRow, 1, 1, row.length).setWrap(true);
   } else {
     sheet.appendRow(row);
+    sheet.getRange(sheet.getLastRow(), 1, 1, row.length).setWrap(true);
   }
 
   return ContentService
