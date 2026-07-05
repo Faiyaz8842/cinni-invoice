@@ -497,7 +497,7 @@ function renderItemRows(){
     row.className = 'item-row';
     row.innerHTML = `
       <input type="text" placeholder="Description of goods" data-field="desc" data-idx="${idx}" value="${escapeAttr(it.desc)}">
-      <input type="text" placeholder="HS Code" data-field="hs" data-idx="${idx}" value="${escapeAttr(it.hs)}">
+      <input type="text" placeholder="HSN Code" data-field="hs" data-idx="${idx}" value="${escapeAttr(it.hs)}">
       <input type="number" min="0" placeholder="Qty" data-field="qty" data-idx="${idx}" value="${it.qty}">
       <input type="number" min="0" step="0.01" placeholder="Unit Price (INR)" data-field="price" data-idx="${idx}" value="${it.price}">
       <button class="rm-btn" data-rm="${idx}" type="button" title="Remove">✕</button>
@@ -675,7 +675,7 @@ function renderPreview(){
 
     <table class="items-table">
       <thead><tr>
-        <th>Description of Goods</th><th>HS Code</th><th class="num">Qty</th><th class="num">Unit Price (INR)</th><th class="num">Total (INR)</th>
+        <th>Description of Goods</th><th>HSN Code</th><th class="num">Qty</th><th class="num">Unit Price (INR)</th><th class="num">Total (INR)</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -831,7 +831,7 @@ function generatePDF(){
   doc.autoTable({
     startY: y,
     margin:{left:margin,right:margin},
-    head: [['Description of Goods','HS Code','Qty','Unit Price (INR)','Total (INR)']],
+    head: [['Description of Goods','HSN Code','Qty','Unit Price (INR)','Total (INR)']],
     body: body,
     styles:{font:'helvetica', fontSize:9.5, cellPadding:6, textColor:[40,32,24]},
     headStyles:{fillColor:[58,42,28], textColor:[237,226,205], fontStyle:'bold'},
