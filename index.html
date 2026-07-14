@@ -299,7 +299,21 @@
         <div class="field"><label>Invoice No.</label><input id="inv_no" type="text" placeholder="Retail00007"></div>
         <div class="field"><label>Invoice Date</label><input id="inv_date" type="date"></div>
       </div>
-      <div class="field"><label>Order Reference</label><input id="inv_ref" type="text" placeholder="Etsy Order"></div>
+      <div class="field">
+        <label>Order Reference / Platform</label>
+        <select id="inv_ref">
+          <option value="Etsy" selected>Etsy</option>
+          <option value="eBay">eBay</option>
+          <option value="Walmart">Walmart</option>
+          <option value="Amazon">Amazon</option>
+          <option value="Shopify">Shopify</option>
+          <option value="CUSTOM">Custom</option>
+        </select>
+      </div>
+      <div class="field" id="custom_ref_field" style="display:none;">
+        <label>Custom Order Reference</label>
+        <input id="inv_ref_custom" type="text" placeholder="Write custom order reference">
+      </div>
       <div class="field">
         <label>Foreign Currency (alongside INR)</label>
         <select id="inv_currency">
@@ -338,6 +352,15 @@
     </div>
 
     <div class="section">
+      <h2>Google Drive PDF Backup</h2>
+      <div class="field">
+        <label>Google Drive Folder Link</label>
+        <input id="drive_folder_link" type="text" placeholder="https://drive.google.com/drive/folders/...">
+      </div>
+      <p class="save-note" style="text-align:left;margin-top:0;">Paste the Google Drive folder link once. It is saved in this browser. Generated invoices will also be sent to the Apps Script for PDF upload into this folder.</p>
+    </div>
+
+    <div class="section">
       <h2>Goods</h2>
       <div class="items" id="items_container"></div>
       <button class="add-row" id="add_item" type="button">+ Add line item</button>
@@ -373,6 +396,22 @@ const FALLBACK_RATES = {USD:0.0120,GBP:0.0095,EUR:0.0110,CAD:0.0165,AUD:0.0182,N
 // Default Google Sheet Web App URL — invoices sync here automatically.
 // Change this if you ever redeploy the Apps Script and get a new URL.
 const DEFAULT_GSHEET_URL = 'https://script.google.com/macros/s/AKfycbyCWNsKhRTph2s3vXcyRns0IOkiikcc6P0pwWKCLyRMFtHX5Le24rb9r-gJwWThHblg/exec';
+
+// ---------- Google Drive folder persistence ----------
+function loadDriveFolder(){
+  document.getElementById('drive_folder_link').value = localStorage.getItem('ci_drive_folder_link') || '';
+}
+function saveDriveFolder(){
+  localStorage.setItem('ci_drive_folder_link', document.getElementById('drive_folder_link').value.trim());
+}
+function extractGoogleDriveFolderId(folderLink){
+  const value = (folderLink || '').trim();
+  if(!value) return '';
+  const folderMatch = value.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  if(folderMatch) return folderMatch[1];
+  if(/^[a-zA-Z0-9_-]{10,}$/.test(value)) return value;
+  return '';
+}
 
 // ---------- login gate ----------
 // NOTE: this is a simple front-end gate for basic access control, not
@@ -537,6 +576,21 @@ document.getElementById('inv_currency').addEventListener('change', onCurrencyOrM
 document.getElementById('inv_method').addEventListener('change', onCurrencyOrMethodChange);
 document.getElementById('inv_rate').addEventListener('input', renderPreview);
 document.getElementById('inv_manual_amount').addEventListener('input', renderPreview);
+document.getElementById('inv_ref').addEventListener('change', onOrderReferenceChange);
+document.getElementById('inv_ref_custom').addEventListener('input', renderPreview);
+
+function onOrderReferenceChange(){
+  const isCustom = document.getElementById('inv_ref').value === 'CUSTOM';
+  document.getElementById('custom_ref_field').style.display = isCustom ? 'block' : 'none';
+  renderPreview();
+}
+
+function getOrderReference(){
+  const selected = document.getElementById('inv_ref').value;
+  return selected === 'CUSTOM'
+    ? document.getElementById('inv_ref_custom').value.trim()
+    : selected;
+}
 
 function onCurrencyOrMethodChange(){
   const cur = document.getElementById('inv_currency').value;
@@ -592,7 +646,8 @@ function getFormState(){
   return {
     exp: {name:g('exp_name'), addr:g('exp_addr'), gstin:g('exp_gstin'), iec:g('exp_iec'), lut:g('exp_lut'), mobile:g('exp_mobile'), email:g('exp_email')},
     con: {name:g('con_name'), addr:g('con_addr'), country:g('con_country')},
-    inv: {no:g('inv_no'), date:g('inv_date'), ref:g('inv_ref'), currency:g('inv_currency'), method:g('inv_method'), rate:parseFloat(g('inv_rate'))||0, manualAmount:parseFloat(g('inv_manual_amount'))||0},
+    inv: {no:g('inv_no'), date:g('inv_date'), ref:getOrderReference(), currency:g('inv_currency'), method:g('inv_method'), rate:parseFloat(g('inv_rate'))||0, manualAmount:parseFloat(g('inv_manual_amount'))||0},
+    drive: {folderLink:g('drive_folder_link'), folderId:extractGoogleDriveFolderId(g('drive_folder_link'))},
     declaration: g('declaration')
   };
 }
@@ -724,6 +779,40 @@ function buildRecord(state, totalInr, totalForeign){
     'Created by': createdBy,
     'Generated At': new Date().toLocaleString()
   };
+}
+
+async function uploadPdfToGoogleDrive(doc, filename, state){
+  if(!DEFAULT_GSHEET_URL || !state.drive.folderLink){ return false; }
+
+  const folderId = state.drive.folderId;
+  if(!folderId){
+    throw new Error('The Google Drive folder link is not valid.');
+  }
+
+  const pdfDataUri = doc.output('datauristring');
+  const pdfBase64 = pdfDataUri.split(',')[1] || '';
+  if(!pdfBase64){
+    throw new Error('Could not prepare the PDF for Google Drive upload.');
+  }
+
+  const params = new URLSearchParams();
+  params.append('action', 'upload_invoice_pdf');
+  params.append('folderId', folderId);
+  params.append('folderLink', state.drive.folderLink);
+  params.append('filename', filename);
+  params.append('invoiceNo', state.inv.no);
+  params.append('pdfBase64', pdfBase64);
+
+  await fetch(DEFAULT_GSHEET_URL, {
+    method:'POST',
+    mode:'no-cors',
+    keepalive:false,
+    headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
+    body: params.toString()
+  });
+
+  console.log('PDF upload request sent to Google Drive Apps Script.');
+  return true;
 }
 
 async function pushToGoogleSheet(record){
@@ -949,7 +1038,24 @@ async function generatePDF(){
   const invNoPart = (state.inv.no ? state.inv.no.replace(/[^a-z0-9\-_]/gi,'_') : 'commercial_invoice');
   const mo = monthName(state.inv.date);
   const filename = invNoPart + (mo ? '-'+mo : '') + '.pdf';
+
+  // Download locally first.
   doc.save(filename);
+
+  // Upload the same PDF to Google Drive when a folder link is provided.
+  if(state.drive.folderLink){
+    generateBtn.disabled = true;
+    generateBtn.textContent = 'Uploading PDF to Drive...';
+    try{
+      await uploadPdfToGoogleDrive(doc, filename, state);
+    }catch(e){
+      alert('The invoice was downloaded, but the Google Drive upload could not be started. ' + e.message);
+      console.warn('Google Drive PDF upload failed:', e);
+    }finally{
+      generateBtn.disabled = false;
+      generateBtn.textContent = 'Generate & Download PDF';
+    }
+  }
 
   // sync this invoice to the Google Sheet (sole persistent record)
   pushToGoogleSheet(buildRecord(state, totalInr, totalForeign));
@@ -959,16 +1065,18 @@ document.getElementById('generate_pdf').addEventListener('click', generatePDF);
 
 // save seller details on any change within that section
 document.querySelectorAll('.panel input, .panel textarea, .panel select').forEach(el=>{
-  el.addEventListener('input', ()=>{ saveExporter(); renderPreview(); });
-  el.addEventListener('change', ()=>{ saveExporter(); renderPreview(); });
+  el.addEventListener('input', ()=>{ saveExporter(); saveDriveFolder(); renderPreview(); });
+  el.addEventListener('change', ()=>{ saveExporter(); saveDriveFolder(); renderPreview(); });
 });
 
 // ---------- init ----------
 function init(){
   loadExporter();
+  loadDriveFolder();
   loadLogo();
   document.getElementById('inv_date').value = new Date().toISOString().slice(0,10);
   renderItemRows();
+  onOrderReferenceChange();
   onCurrencyOrMethodChange();
   renderPreview();
 }
