@@ -395,7 +395,7 @@ const FALLBACK_RATES = {USD:0.0120,GBP:0.0095,EUR:0.0110,CAD:0.0165,AUD:0.0182,N
 
 // Default Google Sheet Web App URL — invoices sync here automatically.
 // Change this if you ever redeploy the Apps Script and get a new URL.
-const DEFAULT_GSHEET_URL = 'https://script.google.com/macros/s/AKfycbyvq7o5Pq-1mqqwNqm2DzCLQbDy0RznFHFuX1J1-YIOTnAe8vGXJ25em2as9inRLOvV/exec';
+const DEFAULT_GSHEET_URL = 'https://script.google.com/macros/s/AKfycbxeogcz26sjy0cdbZQaRXlK5nuXABYTrqEBGgC1zYNoKXU6G9CcWmjmA7tAErXQ1tpe/exec';
 
 // ---------- Google Drive folder persistence ----------
 function loadDriveFolder(){
@@ -781,6 +781,92 @@ function buildRecord(state, totalInr, totalForeign){
   };
 }
 
+function wait(ms){
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function jsonpRequest(params, callbackPrefix, timeoutMs = 12000){
+  return new Promise((resolve, reject)=>{
+    const callbackName = callbackPrefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const script = document.createElement('script');
+
+    const cleanup = () => {
+      try{ delete window[callbackName]; }catch(e){}
+      script.remove();
+      clearTimeout(timer);
+    };
+
+    const timer = setTimeout(()=>{
+      cleanup();
+      reject(new Error('Drive verification timed out.'));
+    }, timeoutMs);
+
+    window[callbackName] = data => {
+      cleanup();
+      resolve(data || {});
+    };
+
+    const query = new URLSearchParams({...params, callback:callbackName});
+    script.onerror = () => {
+      cleanup();
+      reject(new Error('Could not verify the Google Drive upload.'));
+    };
+    script.src = DEFAULT_GSHEET_URL + (DEFAULT_GSHEET_URL.includes('?') ? '&' : '?') + query.toString();
+    document.body.appendChild(script);
+  });
+}
+
+function postPdfUploadForm(payload){
+  return new Promise((resolve)=>{
+    const frameName = 'ciDriveUploadFrame_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const iframe = document.createElement('iframe');
+    const form = document.createElement('form');
+
+    iframe.name = frameName;
+    iframe.style.display = 'none';
+
+    form.method = 'POST';
+    form.action = DEFAULT_GSHEET_URL;
+    form.target = frameName;
+    form.style.display = 'none';
+
+    Object.entries(payload).forEach(([name, value])=>{
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = name;
+      input.value = value == null ? '' : String(value);
+      form.appendChild(input);
+    });
+
+    document.body.appendChild(iframe);
+    document.body.appendChild(form);
+
+    form.submit();
+
+    // Cross-origin Apps Script responses cannot be read directly.
+    // The next step verifies the actual file in Drive via JSONP.
+    setTimeout(()=>{
+      form.remove();
+      iframe.remove();
+      resolve();
+    }, 1500);
+  });
+}
+
+async function checkPdfUploaded(folderId, filename){
+  const data = await jsonpRequest({
+    action: 'check_pdf_upload',
+    folderId,
+    filename
+  }, 'ciDriveCheck');
+
+  if(data && data.error){
+    throw new Error(data.error);
+  }
+
+  return !!(data && data.exists);
+}
+
 async function uploadPdfToGoogleDrive(doc, filename, state){
   if(!DEFAULT_GSHEET_URL || !state.drive.folderLink){ return false; }
 
@@ -795,24 +881,31 @@ async function uploadPdfToGoogleDrive(doc, filename, state){
     throw new Error('Could not prepare the PDF for Google Drive upload.');
   }
 
-  const params = new URLSearchParams();
-  params.append('action', 'upload_invoice_pdf');
-  params.append('folderId', folderId);
-  params.append('folderLink', state.drive.folderLink);
-  params.append('filename', filename);
-  params.append('invoiceNo', state.inv.no);
-  params.append('pdfBase64', pdfBase64);
-
-  await fetch(DEFAULT_GSHEET_URL, {
-    method:'POST',
-    mode:'no-cors',
-    keepalive:false,
-    headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
-    body: params.toString()
+  await postPdfUploadForm({
+    action: 'upload_invoice_pdf',
+    folderId,
+    folderLink: state.drive.folderLink,
+    filename,
+    invoiceNo: state.inv.no,
+    pdfBase64
   });
 
-  console.log('PDF upload request sent to Google Drive Apps Script.');
-  return true;
+  // Confirm the actual PDF exists in the selected Drive folder.
+  for(let attempt = 1; attempt <= 8; attempt++){
+    await wait(attempt === 1 ? 1200 : 900);
+
+    try{
+      const exists = await checkPdfUploaded(folderId, filename);
+      if(exists){
+        console.log('PDF confirmed in Google Drive:', filename);
+        return true;
+      }
+    }catch(e){
+      if(attempt === 8) throw e;
+    }
+  }
+
+  throw new Error('PDF was not found in the Drive folder after upload. Check Apps Script Drive authorization and folder access.');
 }
 
 async function pushToGoogleSheet(record){
@@ -1048,8 +1141,9 @@ async function generatePDF(){
     generateBtn.textContent = 'Uploading PDF to Drive...';
     try{
       await uploadPdfToGoogleDrive(doc, filename, state);
+      alert('Invoice PDF uploaded successfully to Google Drive.');
     }catch(e){
-      alert('The invoice was downloaded, but the Google Drive upload could not be started. ' + e.message);
+      alert('The invoice was downloaded, but the Google Drive PDF was NOT uploaded. ' + e.message);
       console.warn('Google Drive PDF upload failed:', e);
     }finally{
       generateBtn.disabled = false;
