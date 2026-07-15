@@ -374,6 +374,67 @@
 
   .empty-hint{color:#a5895a;font-style:italic;}
 
+  /* ---------- BOTTOM-RIGHT NOTIFICATION ---------- */
+  .toast-container{
+    position:fixed;
+    right:22px;
+    bottom:22px;
+    z-index:12000;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    align-items:flex-end;
+    pointer-events:none;
+  }
+
+  .toast{
+    min-width:260px;
+    max-width:390px;
+    padding:13px 16px;
+    border-radius:7px;
+    background:rgba(36,26,18,0.96);
+    border:1px solid rgba(201,161,95,0.38);
+    color:var(--cream);
+    box-shadow:0 10px 28px rgba(0,0,0,0.38);
+    font-size:12.5px;
+    line-height:1.45;
+    opacity:0;
+    transform:translateY(12px);
+    transition:opacity .2s ease,transform .2s ease;
+  }
+
+  .toast.show{
+    opacity:1;
+    transform:translateY(0);
+  }
+
+  .toast.success{
+    border-color:rgba(143,191,138,0.62);
+  }
+
+  .toast.error{
+    border-color:rgba(217,138,128,0.72);
+  }
+
+  .toast.info{
+    border-color:rgba(201,161,95,0.55);
+  }
+
+  @media (max-width:600px){
+    .toast-container{
+      right:12px;
+      bottom:12px;
+      left:12px;
+      align-items:stretch;
+    }
+
+    .toast{
+      min-width:0;
+      max-width:none;
+      width:100%;
+    }
+  }
+
   /* ---------- LOGIN OVERLAY ---------- */
   .login-overlay{
     position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
@@ -411,6 +472,8 @@
 </style>
 </head>
 <body>
+
+<div class="toast-container" id="toast_container" aria-live="polite" aria-atomic="true"></div>
 
 <div id="login_overlay" class="login-overlay">
   <div class="login-card">
@@ -619,6 +682,30 @@
 <script>
 const CURRENCY_SYMBOL = {USD:'$',GBP:'£',EUR:'€',CAD:'CA$',AUD:'A$',NZD:'NZ$',NONE:''};
 const FALLBACK_RATES = {USD:0.0120,GBP:0.0095,EUR:0.0110,CAD:0.0165,AUD:0.0182,NZD:0.0198};
+
+// ---------- non-blocking notifications ----------
+function showToast(message, type = 'info', duration = 4200){
+  const container = document.getElementById('toast_container');
+  const toast = document.createElement('div');
+
+  toast.className = 'toast ' + type;
+  toast.textContent = message;
+
+  container.appendChild(toast);
+
+  requestAnimationFrame(()=>{
+    toast.classList.add('show');
+  });
+
+  setTimeout(()=>{
+    toast.classList.remove('show');
+
+    setTimeout(()=>{
+      toast.remove();
+    }, 220);
+
+  }, duration);
+}
 
 // Default Google Sheet Web App URL — invoices sync here automatically.
 // Change this if you ever redeploy the Apps Script and get a new URL.
@@ -1645,17 +1732,20 @@ async function generatePDF(){
     try{
       await uploadPdfToGoogleDrive(doc, filename, state);
 
-      alert(
+      showToast(
         downloadLocally
-          ? 'Invoice PDF downloaded locally and uploaded successfully to Google Drive.'
-          : 'Invoice PDF uploaded successfully to Google Drive.'
+          ? 'Invoice downloaded locally and uploaded to Google Drive.'
+          : 'Invoice uploaded to Google Drive.',
+        'success'
       );
 
     }catch(e){
-      alert(
+      showToast(
         downloadLocally
-          ? 'The invoice was downloaded locally, but the Google Drive PDF was NOT uploaded. ' + e.message
-          : 'The Google Drive PDF was NOT uploaded. ' + e.message
+          ? 'Invoice downloaded locally, but Drive upload failed.'
+          : 'Google Drive upload failed.',
+        'error',
+        6000
       );
 
       console.warn('Google Drive PDF upload failed:', e);
