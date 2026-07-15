@@ -1322,40 +1322,24 @@ function jsonpRequest(params, callbackPrefix, timeoutMs = 12000){
   });
 }
 
-function postPdfUploadForm(payload){
-  return new Promise((resolve)=>{
-    const frameName = 'ciDriveUploadFrame_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    const iframe = document.createElement('iframe');
-    const form = document.createElement('form');
+async function postPdfUploadForm(payload){
+  const params = new URLSearchParams();
 
-    iframe.name = frameName;
-    iframe.style.display = 'none';
+  Object.entries(payload).forEach(([name, value])=>{
+    params.append(name, value == null ? '' : String(value));
+  });
 
-    form.method = 'POST';
-    form.action = DEFAULT_GSHEET_URL;
-    form.target = frameName;
-    form.style.display = 'none';
-
-    Object.entries(payload).forEach(([name, value])=>{
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = name;
-      input.value = value == null ? '' : String(value);
-      form.appendChild(input);
-    });
-
-    document.body.appendChild(iframe);
-    document.body.appendChild(form);
-
-    form.submit();
-
-    // Cross-origin Apps Script responses cannot be read directly.
-    // The next step verifies the actual file in Drive via JSONP.
-    setTimeout(()=>{
-      form.remove();
-      iframe.remove();
-      resolve();
-    }, 1500);
+  // Let the browser keep the POST request alive until Apps Script has
+  // received it. The response is opaque because Apps Script does not
+  // expose CORS headers, so the next step verifies the real file in Drive.
+  await fetch(DEFAULT_GSHEET_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    keepalive: false,
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+    },
+    body: params.toString()
   });
 }
 
@@ -1397,21 +1381,24 @@ async function uploadPdfToGoogleDrive(doc, filename, state){
   });
 
   // Confirm the actual PDF exists in the selected Drive folder.
-  for(let attempt = 1; attempt <= 8; attempt++){
-    await wait(attempt === 1 ? 1200 : 900);
+  // Apps Script can take a few seconds to decode and write the PDF.
+  for(let attempt = 1; attempt <= 12; attempt++){
+    await wait(attempt === 1 ? 1800 : 1100);
 
     try{
       const exists = await checkPdfUploaded(folderId, filename);
+
       if(exists){
         console.log('PDF confirmed in Google Drive:', filename);
         return true;
       }
+
     }catch(e){
-      if(attempt === 8) throw e;
+      if(attempt === 12) throw e;
     }
   }
 
-  throw new Error('PDF was not found in the Drive folder after upload. Check Apps Script Drive authorization and folder access.');
+  throw new Error('The PDF upload request finished, but the file was not found in the selected Google Drive folder. Open Apps Script > Executions and check the latest upload_invoice_pdf execution.');
 }
 
 async function pushToGoogleSheet(record){
